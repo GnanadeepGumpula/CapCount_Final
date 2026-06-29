@@ -6,12 +6,14 @@ import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectPage } from './pages/ProjectPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { ProfilePage } from './pages/ProfilePage';
 import DeveloperBadge from './components/DeveloperBadge';
 
 type Route =
   | { name: 'dashboard' }
   | { name: 'project'; projectId: string }
-  | { name: 'analytics'; projectId: string };
+  | { name: 'analytics'; projectId: string }
+  | { name: 'profile' };
 
 function parseHash(): Route {
   const h = window.location.hash.replace(/^#\/?/, '');
@@ -23,12 +25,16 @@ function parseHash(): Route {
     const id = h.slice('analytics/'.length);
     if (id) return { name: 'analytics', projectId: id };
   }
+  if (h === 'profile') {
+    return { name: 'profile' };
+  }
   return { name: 'dashboard' };
 }
 
 function routeToHash(r: Route): string {
   if (r.name === 'project') return `#/project/${r.projectId}`;
   if (r.name === 'analytics') return `#/analytics/${r.projectId}`;
+  if (r.name === 'profile') return '#/profile';
   return '#/';
 }
 
@@ -62,15 +68,26 @@ function Shell() {
         projectId={route.projectId}
         onBack={() => navigate({ name: 'dashboard' })}
         onOpenAnalytics={(id) => navigate({ name: 'analytics', projectId: id })}
+        onOpenProfile={() => navigate({ name: 'profile' })}
       />
     );
   }
 
   if (route.name === 'analytics') {
-    return <AnalyticsPage projectId={route.projectId} onBack={() => navigate({ name: 'project', projectId: route.projectId })} />;
+    return (
+      <AnalyticsPage
+        projectId={route.projectId}
+        onBack={() => navigate({ name: 'project', projectId: route.projectId })}
+        onOpenProfile={() => navigate({ name: 'profile' })}
+      />
+    );
   }
 
-  return <DashboardPage onOpenProject={(id) => navigate({ name: 'project', projectId: id })} />;
+  if (route.name === 'profile') {
+    return <ProfilePage onBack={() => navigate({ name: 'dashboard' })} />;
+  }
+
+  return <DashboardPage onOpenProject={(id) => navigate({ name: 'project', projectId: id })} onOpenProfile={() => navigate({ name: 'profile' })} />;
 }
 
 export default function App() {

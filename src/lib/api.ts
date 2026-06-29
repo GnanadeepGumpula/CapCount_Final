@@ -8,6 +8,7 @@ import type {
   PaymentMethod,
   Project,
   ProjectLedger,
+  ProjectAccessEntry,
 } from './types';
 
 export async function fetchProjects(): Promise<Project[]> {
@@ -19,10 +20,30 @@ export async function fetchProjects(): Promise<Project[]> {
   return (data ?? []) as Project[];
 }
 
+async function getCurrentUserId(): Promise<string> {
+  const [{ data: sessionData }, { data: userData }] = await Promise.all([
+    supabase.auth.getSession(),
+    supabase.auth.getUser(),
+  ]);
+
+  const userId = userData.user?.id ?? sessionData.session?.user?.id;
+  if (import.meta.env.DEV) {
+    console.log('Supabase auth debug:', {
+      user: userData.user,
+      session: sessionData.session,
+      userId,
+    });
+  }
+
+  if (!userId) throw new Error('Not authenticated. Please sign in and try again.');
+  return userId;
+}
+
 export async function createProject(title: string, description: string | null): Promise<Project> {
+  const user_id = await getCurrentUserId();
   const { data, error } = await supabase
     .from('projects')
-    .insert({ title, description })
+    .insert({ title, description, user_id })
     .select()
     .maybeSingle();
   if (error) throw new Error(humanizePgError(error));
@@ -93,10 +114,47 @@ export interface FundingInput {
   notes?: string | null;
 }
 
+export interface ProjectAccessCreateInput {
+  name: string;
+  email: string;
+  role: string;
+  access: 'View' | 'Edit' | 'Admin';
+}
+
+export async function fetchProjectAccess(projectId: string): Promise<ProjectAccessEntry[]> {
+  const { data, error } = await supabase
+    .from('project_access')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(humanizePgError(error));
+  return (data ?? []) as ProjectAccessEntry[];
+}
+
+export async function addProjectAccessEntry(projectId: string, input: ProjectAccessCreateInput): Promise<ProjectAccessEntry> {
+  const { data, error } = await supabase
+    .from('project_access')
+    .insert({ project_id: projectId, ...input })
+    .select()
+    .maybeSingle();
+  if (error) throw new Error(humanizePgError(error));
+  if (!data) throw new Error('Could not add project access entry.');
+  return data as ProjectAccessEntry;
+}
+
+export async function deleteProjectAccessEntry(id: string): Promise<void> {
+  const { error } = await supabase.from('project_access').delete().eq('id', id);
+  if (error) throw new Error(humanizePgError(error));
+}
+
 export async function addFundingSource(projectId: string, input: FundingInput): Promise<FundingSource> {
+  const user_id = await getCurrentUserId();
+  if (import.meta.env.DEV) {
+    console.log('addFundingSource payload', { projectId, input, user_id });
+  }
   const { data, error } = await supabase
     .from('funding_sources')
-    .insert({ project_id: projectId, ...input })
+    .insert({ project_id: projectId, user_id, ...input })
     .select()
     .maybeSingle();
   if (error) throw new Error(humanizePgError(error));
@@ -124,9 +182,10 @@ export interface ExpenseObjectInput {
 }
 
 export async function addExpenseObject(projectId: string, input: ExpenseObjectInput): Promise<ExpenseObject> {
+  const user_id = await getCurrentUserId();
   const { data, error } = await supabase
     .from('expense_objects')
-    .insert({ project_id: projectId, ...input })
+    .insert({ project_id: projectId, user_id, ...input })
     .select()
     .maybeSingle();
   if (error) throw new Error(humanizePgError(error));
@@ -152,9 +211,10 @@ export interface ExpensePersonInput {
 }
 
 export async function addExpensePerson(projectId: string, input: ExpensePersonInput): Promise<ExpensePerson> {
+  const user_id = await getCurrentUserId();
   const { data, error } = await supabase
     .from('expense_people')
-    .insert({ project_id: projectId, ...input })
+    .insert({ project_id: projectId, user_id, ...input })
     .select()
     .maybeSingle();
   if (error) throw new Error(humanizePgError(error));
@@ -181,9 +241,10 @@ export interface InstallmentInput {
 }
 
 export async function addInstallment(expensePersonId: string, projectId: string, input: InstallmentInput): Promise<Installment> {
+  const user_id = await getCurrentUserId();
   const { data, error } = await supabase
     .from('installments')
-    .insert({ expense_person_id: expensePersonId, project_id: projectId, ...input })
+    .insert({ expense_person_id: expensePersonId, project_id: projectId, user_id, ...input })
     .select()
     .maybeSingle();
   if (error) throw new Error(humanizePgError(error));

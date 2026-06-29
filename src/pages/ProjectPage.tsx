@@ -43,11 +43,12 @@ interface ProjectPageProps {
   projectId: string;
   onBack: () => void;
   onOpenAnalytics: (projectId: string) => void;
+  onOpenProfile: () => void;
 }
 
 type FilterKind = 'all' | 'people' | 'objects' | 'funding';
 
-export function ProjectPage({ projectId, onBack, onOpenAnalytics }: ProjectPageProps) {
+export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile }: ProjectPageProps) {
   const [ledger, setLedger] = useState<ProjectLedger | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -149,7 +150,7 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics }: ProjectPageP
     });
   }
 
-  function applyPerson(p: ExpensePerson, wasEdit: boolean, initialPaid = 0, initialInstallment?: Installment) {
+  function applyPerson(p: ExpensePerson, wasEdit: boolean, initialInstallment?: Installment) {
     setLedger((cur) => {
       if (!cur) return cur;
       const existing = cur.expensePeople.find((x) => x.id === p.id);
@@ -258,6 +259,8 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics }: ProjectPageP
         onOpenAnalytics={ledger ? () => onOpenAnalytics(ledger.project.id) : undefined}
         onExportPdf={ledger ? handleExport : undefined}
         onOpenSettings={isProductionLeader ? () => setAccessModalOpen(true) : undefined}
+        onOpenProfile={onOpenProfile}
+
       />
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
@@ -436,8 +439,8 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics }: ProjectPageP
         projectId={projectId}
         editing={personModal.editing}
         onClose={() => setPersonModal({ open: false })}
-        onSaved={(p, wasEdit, initialPaid, initialInstallment) => {
-          applyPerson(p, wasEdit, initialPaid, initialInstallment);
+        onSaved={(p, wasEdit, _initialPaid, initialInstallment) => {
+          applyPerson(p, wasEdit, initialInstallment);
           setPersonModal({ open: false });
         }}
       />

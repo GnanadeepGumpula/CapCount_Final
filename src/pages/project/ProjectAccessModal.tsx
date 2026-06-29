@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, UserRound } from 'lucide-react';
 import { Modal } from '../../components/Modal';
 import { Field } from '../../components/Field';
-import { getProjectAccess, saveProjectAccess, setStoredUserRole, getStoredUserRole } from '../../lib/projectAccess';
+import { setStoredUserRole, getStoredUserRole } from '../../lib/projectAccess';
+import { addProjectAccessEntry, deleteProjectAccessEntry, fetchProjectAccess } from '../../lib/api';
+import type { ProjectAccessEntry } from '../../lib/types';
 
 interface ProjectAccessModalProps {
   open: boolean;
@@ -12,40 +14,71 @@ interface ProjectAccessModalProps {
 }
 
 export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: ProjectAccessModalProps) {
-  const [entries, setEntries] = useState(() => getProjectAccess(projectId));
+  const [entries, setEntries] = useState<ProjectAccessEntry[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
   const [access, setAccess] = useState<'View' | 'Edit' | 'Admin'>('View');
   const [managerRole, setManagerRole] = useState(getStoredUserRole());
+  const [loadingEntries, setLoadingEntries] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    async function loadEntries() {
+      setLoadingEntries(true);
+      setError(null);
+      try {
+        const next = await fetchProjectAccess(projectId);
+        setEntries(next);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Could not load shared access entries.';
+        setError(msg);
+      } finally {
+        setLoadingEntries(false);
+      }
+    }
+
     if (open) {
-      setEntries(getProjectAccess(projectId));
+      loadEntries();
       setManagerRole(getStoredUserRole());
     }
   }, [open, projectId]);
 
   const isLeader = useMemo(() => /leader/i.test(managerRole), [managerRole]);
 
-  function addEntry() {
+  async function addEntry() {
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     const trimmedRole = role.trim();
     if (!trimmedName || !trimmedEmail || !trimmedRole) return;
-    const next = [...entries, { id: crypto.randomUUID(), name: trimmedName, email: trimmedEmail, role: trimmedRole, access, createdAt: new Date().toISOString() }];
-    setEntries(next);
-    saveProjectAccess(projectId, next);
-    setName('');
-    setEmail('');
-    setRole('');
-    setAccess('View');
+    try {
+      const entry = await addProjectAccessEntry(projectId, {
+        name: trimmedName,
+        email: trimmedEmail,
+        role: trimmedRole,
+        access,
+      });
+      setEntries((cur) => [entry, ...cur]);
+      setName('');
+      setEmail('');
+      setRole('');
+      setAccess('View');
+      setError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not add access entry.';
+      setError(msg);
+    }
   }
 
-  function removeEntry(id: string) {
-    const next = entries.filter((entry) => entry.id !== id);
-    setEntries(next);
-    saveProjectAccess(projectId, next);
+  async function removeEntry(id: string) {
+    try {
+      await deleteProjectAccessEntry(id);
+      setEntries((cur) => cur.filter((entry) => entry.id !== id));
+      setError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not remove access entry.';
+      setError(msg);
+    }
   }
 
   function saveManagerRole() {
@@ -99,7 +132,11 @@ export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: P
             <Field label="Role" htmlFor="access-role">
               <input id="access-role" value={role} onChange={(e) => setRole(e.target.value)} className="input" placeholder="e.g. Assistant Director" disabled={!isLeader} />
             </Field>
-            {entries.length === 0 ? (
+            {loadingEntries ? (
+              <div className="rounded-xl border border-dashed border-ink-200 bg-ink-50 px-4 py-6 text-center text-sm text-ink-500">
+                Loading collaborators…
+              </div>
+            ) : entries.length === 0 ? (
               <div className="rounded-xl border border-dashed border-ink-200 bg-ink-50 px-4 py-6 text-center text-sm text-ink-500">
                 No shared collaborators yet.
               </div>
@@ -125,6 +162,11 @@ export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: P
               ))
             )}
           </div>
+          {error ? (
+            <div className="rounded-xl border border-danger-200 bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">
+              {error}
+            </div>
+          ) : null}
         </div>
       </div>
     </Modal>

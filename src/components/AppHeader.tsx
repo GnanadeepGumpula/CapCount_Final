@@ -11,9 +11,10 @@ interface AppHeaderProps {
   onOpenAnalytics?: () => void;
   onExportPdf?: () => void;
   onOpenSettings?: () => void;
+  onOpenProfile?: () => void;
 }
 
-export function AppHeader({ onHome, summary, onOpenAnalytics, onExportPdf, onOpenSettings }: AppHeaderProps) {
+export function AppHeader({ onHome, summary, onOpenAnalytics, onExportPdf, onOpenSettings, onOpenProfile }: AppHeaderProps) {
   const { user, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -47,7 +48,7 @@ export function AppHeader({ onHome, summary, onOpenAnalytics, onExportPdf, onOpe
           {/* Left Brand Area — Styled with a larger prominent logo image wrapper */}
           <button onClick={onHome} className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-80">
             <img 
-              src="/logo.ico" 
+              src="/logo.png" 
               alt="CapCount logo" 
               className="h-11 w-11 rounded-xl object-contain shadow-sm"
               onError={(e) => {
@@ -189,10 +190,17 @@ export function AppHeader({ onHome, summary, onOpenAnalytics, onExportPdf, onOpe
                         Administrative Settings
                       </button>
                     )}
-                    <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
-                      <UserCircle2 className="h-4 w-4 text-brand-600" />
-                      User Profile
-                    </button>
+                    {onOpenProfile ? (
+                      <button type="button" onClick={() => { setMenuOpen(false); onOpenProfile(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
+                        <UserCircle2 className="h-4 w-4 text-brand-600" />
+                        User Profile
+                      </button>
+                    ) : (
+                      <button type="button" className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-ink-400" disabled>
+                        <UserCircle2 className="h-4 w-4 text-brand-400" />
+                        User Profile (coming soon)
+                      </button>
+                    )}
                   </div>
 
                   {/* Sign Out Action Area */}

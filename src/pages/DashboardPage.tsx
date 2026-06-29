@@ -15,9 +15,10 @@ import { ProjectAccessModal } from './project/ProjectAccessModal';
 
 interface DashboardPageProps {
   onOpenProject: (id: string) => void;
+  onOpenProfile: () => void;
 }
 
-export function DashboardPage({ onOpenProject }: DashboardPageProps) {
+export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPageProps) {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -46,7 +47,7 @@ export function DashboardPage({ onOpenProject }: DashboardPageProps) {
 
   return (
     <div className="min-h-screen bg-ink-50">
-      <AppHeader onHome={() => {}} />
+      <AppHeader onHome={() => {}} onOpenProfile={onOpenProfile} />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -125,6 +126,7 @@ export function DashboardPage({ onOpenProject }: DashboardPageProps) {
         onSaved={(p) => {
           setProjects((cur) => (cur ? [p, ...cur] : [p]));
           toast.success('Project created', `"${p.title}" is ready. Open it to start logging funds.`);
+          onOpenProject(p.id);
         }}
       />
 

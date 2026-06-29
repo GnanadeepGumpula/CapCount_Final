@@ -36,7 +36,7 @@ export default function DeveloperBadge() {
           />
         </div>
         <span className="whitespace-nowrap pr-1 text-ink-700 hover:text-brand-700 transition-colors">
-          Developed by Gnanadeep Gumpula
+          Build by Gnanadeep Gumpula
         </span>
       </a>
       

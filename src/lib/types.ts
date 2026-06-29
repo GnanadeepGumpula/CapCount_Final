@@ -59,6 +59,17 @@ export interface Installment {
   created_at: string;
 }
 
+export interface ProjectAccessEntry {
+  id: string;
+  project_id: string;
+  user_id: string | null;
+  name: string;
+  email: string;
+  role: string;
+  access: 'View' | 'Edit' | 'Admin';
+  created_at: string;
+}
+
 export interface ExpensePersonWithInstallments extends ExpensePerson {
   installments: Installment[];
   total_paid: number;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Eye, EyeOff, Film, Lock, Mail, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useToast } from '../lib/toast';
 import { Spinner } from '../components/Spinner';
@@ -214,7 +214,7 @@ function BrandMark({ light = false }: { light?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white shadow-soft">
-        <Film className="h-5 w-5" />
+        <img src="/logo.png" alt="CapCount logo" className="h-6 w-6 object-contain" />
       </div>
       <div>
         <p className={`font-display text-lg font-bold ${light ? 'text-white' : 'text-ink-900'}`}>CapCount</p>

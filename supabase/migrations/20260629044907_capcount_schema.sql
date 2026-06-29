@@ -87,8 +87,16 @@ CREATE TABLE IF NOT EXISTS projects (
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "select_own_projects" ON projects;
-CREATE POLICY "select_own_projects" ON projects FOR SELECT
-  TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "select_owned_or_shared_projects" ON projects FOR SELECT
+  TO authenticated USING (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1 FROM project_access
+      WHERE project_access.project_id = projects.id
+        AND (project_access.user_id = auth.uid() OR lower(trim(project_access.email)) = lower(trim(auth.jwt() ->> 'email')))
+        AND project_access.access IN ('View','Edit','Admin')
+    )
+  );
 
 DROP POLICY IF EXISTS "insert_own_projects" ON projects;
 CREATE POLICY "insert_own_projects" ON projects FOR INSERT
@@ -103,6 +111,114 @@ CREATE POLICY "delete_own_projects" ON projects FOR DELETE
   TO authenticated USING (auth.uid() = user_id);
 
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
+
+CREATE TABLE IF NOT EXISTS project_access (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  email text NOT NULL,
+  role text NOT NULL,
+  access text NOT NULL CHECK (access IN ('View','Edit','Admin')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE project_access
+  ADD COLUMN IF NOT EXISTS access text NOT NULL DEFAULT 'View';
+ALTER TABLE project_access
+  ALTER COLUMN access DROP DEFAULT;
+
+ALTER TABLE project_access ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "select_project_access" ON project_access;
+CREATE POLICY "select_project_access" ON project_access FOR SELECT
+  TO authenticated USING (
+    EXISTS (
+      SELECT 1
+      FROM projects p
+      WHERE p.id = project_access.project_id
+        AND (
+          p.user_id = auth.uid()
+          OR project_access.user_id = auth.uid()
+          OR project_access.email = auth.jwt() ->> 'email'
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS "insert_project_access" ON project_access;
+CREATE POLICY "insert_project_access" ON project_access FOR INSERT
+  TO authenticated WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM projects p
+      WHERE p.id = project_access.project_id
+        AND p.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "update_project_access" ON project_access;
+CREATE POLICY "update_project_access" ON project_access FOR UPDATE
+  TO authenticated USING (
+    EXISTS (
+      SELECT 1 FROM projects p
+      WHERE p.id = project_access.project_id
+        AND p.user_id = auth.uid()
+    )
+  ) WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM projects p
+      WHERE p.id = project_access.project_id
+        AND p.user_id = auth.uid()
+    )
+    AND access IN ('View','Edit','Admin')
+  );
+
+DROP POLICY IF EXISTS "delete_project_access" ON project_access;
+CREATE POLICY "delete_project_access" ON project_access FOR DELETE
+  TO authenticated USING (
+    EXISTS (
+      SELECT 1 FROM projects p
+      WHERE p.id = project_access.project_id
+        AND p.user_id = auth.uid()
+    )
+  );
+
+CREATE INDEX IF NOT EXISTS idx_project_access_project_id ON project_access(project_id);
+
+CREATE FUNCTION can_view_project(p_uuid uuid) RETURNS boolean LANGUAGE SQL STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM projects p
+    LEFT JOIN project_access pa ON pa.project_id = p.id
+    WHERE p.id = p_uuid
+      AND (
+        p.user_id = auth.uid()
+        OR (
+          (pa.user_id = auth.uid() OR lower(trim(pa.email)) = lower(trim(auth.jwt() ->> 'email')))
+          AND pa.access IN ('View','Edit','Admin')
+        )
+      )
+  );
+$$;
+
+CREATE FUNCTION can_edit_project(p_uuid uuid) RETURNS boolean LANGUAGE SQL STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM projects p
+    LEFT JOIN project_access pa ON pa.project_id = p.id
+    WHERE p.id = p_uuid
+      AND (
+        p.user_id = auth.uid()
+        OR (
+          (pa.user_id = auth.uid() OR lower(trim(pa.email)) = lower(trim(auth.jwt() ->> 'email')))
+          AND pa.access IN ('Edit','Admin')
+        )
+      )
+  );
+$$;
+
+CREATE FUNCTION can_access_project(p_uuid uuid) RETURNS boolean LANGUAGE SQL STABLE AS $$
+  SELECT can_view_project(p_uuid);
+$$;
 
 CREATE TABLE IF NOT EXISTS funding_sources (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -120,19 +236,20 @@ ALTER TABLE funding_sources ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "select_own_funding_sources" ON funding_sources;
 CREATE POLICY "select_own_funding_sources" ON funding_sources FOR SELECT
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (can_view_project(project_id));
 
 DROP POLICY IF EXISTS "insert_own_funding_sources" ON funding_sources;
 CREATE POLICY "insert_own_funding_sources" ON funding_sources FOR INSERT
-  TO authenticated WITH CHECK (auth.uid() = user_id);
+  TO authenticated WITH CHECK (auth.uid() = user_id AND can_edit_project(project_id));
 
 DROP POLICY IF EXISTS "update_own_funding_sources" ON funding_sources;
 CREATE POLICY "update_own_funding_sources" ON funding_sources FOR UPDATE
-  TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id OR can_edit_project(project_id))
+  WITH CHECK (auth.uid() = user_id OR can_edit_project(project_id));
 
 DROP POLICY IF EXISTS "delete_own_funding_sources" ON funding_sources;
 CREATE POLICY "delete_own_funding_sources" ON funding_sources FOR DELETE
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id OR can_edit_project(project_id));
 
 CREATE INDEX IF NOT EXISTS idx_funding_sources_project_id ON funding_sources(project_id);
 CREATE INDEX IF NOT EXISTS idx_funding_sources_user_id ON funding_sources(user_id);
@@ -154,19 +271,20 @@ ALTER TABLE expense_objects ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "select_own_expense_objects" ON expense_objects;
 CREATE POLICY "select_own_expense_objects" ON expense_objects FOR SELECT
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (can_view_project(project_id));
 
 DROP POLICY IF EXISTS "insert_own_expense_objects" ON expense_objects;
 CREATE POLICY "insert_own_expense_objects" ON expense_objects FOR INSERT
-  TO authenticated WITH CHECK (auth.uid() = user_id);
+  TO authenticated WITH CHECK (auth.uid() = user_id AND can_edit_project(project_id));
 
 DROP POLICY IF EXISTS "update_own_expense_objects" ON expense_objects;
 CREATE POLICY "update_own_expense_objects" ON expense_objects FOR UPDATE
-  TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id OR can_edit_project(project_id))
+  WITH CHECK (auth.uid() = user_id OR can_edit_project(project_id));
 
 DROP POLICY IF EXISTS "delete_own_expense_objects" ON expense_objects;
 CREATE POLICY "delete_own_expense_objects" ON expense_objects FOR DELETE
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id OR can_edit_project(project_id));
 
 CREATE INDEX IF NOT EXISTS idx_expense_objects_project_id ON expense_objects(project_id);
 CREATE INDEX IF NOT EXISTS idx_expense_objects_user_id ON expense_objects(user_id);
@@ -186,19 +304,20 @@ ALTER TABLE expense_people ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "select_own_expense_people" ON expense_people;
 CREATE POLICY "select_own_expense_people" ON expense_people FOR SELECT
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (can_view_project(project_id));
 
 DROP POLICY IF EXISTS "insert_own_expense_people" ON expense_people;
 CREATE POLICY "insert_own_expense_people" ON expense_people FOR INSERT
-  TO authenticated WITH CHECK (auth.uid() = user_id);
+  TO authenticated WITH CHECK (auth.uid() = user_id AND can_edit_project(project_id));
 
 DROP POLICY IF EXISTS "update_own_expense_people" ON expense_people;
 CREATE POLICY "update_own_expense_people" ON expense_people FOR UPDATE
-  TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id OR can_edit_project(project_id))
+  WITH CHECK (auth.uid() = user_id OR can_edit_project(project_id));
 
 DROP POLICY IF EXISTS "delete_own_expense_people" ON expense_people;
 CREATE POLICY "delete_own_expense_people" ON expense_people FOR DELETE
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id OR can_edit_project(project_id));
 
 CREATE INDEX IF NOT EXISTS idx_expense_people_project_id ON expense_people(project_id);
 CREATE INDEX IF NOT EXISTS idx_expense_people_user_id ON expense_people(user_id);
@@ -220,19 +339,20 @@ ALTER TABLE installments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "select_own_installments" ON installments;
 CREATE POLICY "select_own_installments" ON installments FOR SELECT
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (can_view_project(project_id));
 
 DROP POLICY IF EXISTS "insert_own_installments" ON installments;
 CREATE POLICY "insert_own_installments" ON installments FOR INSERT
-  TO authenticated WITH CHECK (auth.uid() = user_id);
+  TO authenticated WITH CHECK (auth.uid() = user_id AND can_edit_project(project_id));
 
 DROP POLICY IF EXISTS "update_own_installments" ON installments;
 CREATE POLICY "update_own_installments" ON installments FOR UPDATE
-  TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id OR can_edit_project(project_id))
+  WITH CHECK (auth.uid() = user_id OR can_edit_project(project_id));
 
 DROP POLICY IF EXISTS "delete_own_installments" ON installments;
 CREATE POLICY "delete_own_installments" ON installments FOR DELETE
-  TO authenticated USING (auth.uid() = user_id);
+  TO authenticated USING (auth.uid() = user_id OR can_edit_project(project_id));
 
 CREATE INDEX IF NOT EXISTS idx_installments_expense_person_id ON installments(expense_person_id);
 CREATE INDEX IF NOT EXISTS idx_installments_project_id ON installments(project_id);
