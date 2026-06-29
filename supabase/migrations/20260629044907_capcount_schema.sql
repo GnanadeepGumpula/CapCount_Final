@@ -119,7 +119,8 @@ CREATE TABLE IF NOT EXISTS project_access (
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   name text NOT NULL,
   email text NOT NULL,
-  role text NOT NULL,
+  role text NOT NULL DEFAULT '',
+  role_label text NOT NULL DEFAULT '',
   access text NOT NULL CHECK (access IN ('View','Edit','Admin')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -204,12 +205,13 @@ BEGIN
     WHERE project_id = NEW.id
       AND user_id = NEW.user_id
   ) THEN
-    INSERT INTO project_access (project_id, user_id, email, name, role, access, created_at)
+    INSERT INTO project_access (project_id, user_id, email, name, role, role_label, access, created_at)
     VALUES (
       NEW.id,
       NEW.user_id,
       COALESCE(auth.jwt() ->> 'email', ''),
       COALESCE(auth.jwt() ->> 'email', ''),
+      'Owner',
       'Owner',
       'Admin',
       now()

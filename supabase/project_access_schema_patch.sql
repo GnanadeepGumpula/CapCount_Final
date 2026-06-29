@@ -7,17 +7,21 @@ ALTER TABLE project_access
   ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS role_label text NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS access text NOT NULL DEFAULT 'View';
 
 UPDATE project_access SET name = '' WHERE name IS NULL;
 UPDATE project_access SET role = '' WHERE role IS NULL;
 UPDATE project_access SET access = 'View' WHERE access IS NULL;
+UPDATE project_access SET role_label = '' WHERE role_label IS NULL;
 
 ALTER TABLE project_access ALTER COLUMN name DROP DEFAULT;
 ALTER TABLE project_access ALTER COLUMN role DROP DEFAULT;
 ALTER TABLE project_access ALTER COLUMN access DROP DEFAULT;
+ALTER TABLE project_access ALTER COLUMN role_label DROP DEFAULT;
 ALTER TABLE project_access ALTER COLUMN name SET NOT NULL;
 ALTER TABLE project_access ALTER COLUMN role SET NOT NULL;
+ALTER TABLE project_access ALTER COLUMN role_label SET NOT NULL;
 
 ALTER TABLE project_access ENABLE ROW LEVEL SECURITY;
 
@@ -103,12 +107,13 @@ BEGIN
     WHERE project_id = NEW.id
       AND user_id = NEW.user_id
   ) THEN
-    INSERT INTO project_access (project_id, user_id, email, name, role, access, created_at)
+    INSERT INTO project_access (project_id, user_id, email, name, role, role_label, access, created_at)
     VALUES (
       NEW.id,
       NEW.user_id,
       COALESCE(auth.jwt() ->> 'email', ''),
       COALESCE(auth.jwt() ->> 'email', ''),
+      'Owner',
       'Owner',
       'Admin',
       now()

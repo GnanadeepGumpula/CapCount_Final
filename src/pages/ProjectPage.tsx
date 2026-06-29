@@ -287,7 +287,7 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile 
                   <p className="mt-1 max-w-2xl text-sm text-ink-500">{ledger.project.description}</p>
                 )}
               </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
                 {currentUserId && ledger?.project.user_id === currentUserId ? (
                   <button onClick={() => setAccessModalOpen(true)} className="btn-secondary">
                     <Settings className="h-4 w-4" />
