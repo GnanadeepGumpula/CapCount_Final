@@ -6,6 +6,7 @@ import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectPage } from './pages/ProjectPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import DeveloperBadge from './components/DeveloperBadge';
 
 type Route =
   | { name: 'dashboard' }
@@ -76,6 +77,7 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
+        <DeveloperBadge />
         <Shell />
       </AuthProvider>
     </ToastProvider>
