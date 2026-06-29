@@ -18,6 +18,7 @@ import {
   deleteExpensePerson,
   deleteFundingSource,
   fetchProjectLedger,
+  getCurrentUserId,
 } from '../lib/api';
 import type {
   ExpenseObject,
@@ -37,7 +38,6 @@ import { InstallmentFormModal } from './project/InstallmentFormModal';
 import { OnboardingModal } from './project/OnboardingModal';
 import { ProjectAccessModal } from './project/ProjectAccessModal';
 import { exportProjectPdf } from '../lib/pdf';
-import { getStoredUserRole } from '../lib/projectAccess';
 
 interface ProjectPageProps {
   projectId: string;
@@ -61,6 +61,7 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile 
   const [personModal, setPersonModal] = useState<{ open: boolean; editing?: ExpensePerson }>({ open: false });
   const [installmentModal, setInstallmentModal] = useState<{ open: boolean; person: ExpensePersonWithInstallments | null }>({ open: false, person: null });
   const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<
     | { kind: 'funding'; id: string; title: string }
@@ -70,15 +71,14 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile 
   >(null);
 
   const toast = useToast();
-  const roleLabel = getStoredUserRole();
-  const isProductionLeader = /leader/i.test(roleLabel);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchProjectLedger(projectId);
+      const [data, userId] = await Promise.all([fetchProjectLedger(projectId), getCurrentUserId()]);
       setLedger(data);
+      setCurrentUserId(userId);
       if (data.fundingSources.length === 0 && data.expenseObjects.length === 0 && data.expensePeople.length === 0) {
         setOnboardingOpen(true);
       }
@@ -258,7 +258,7 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile 
         summary={ledger ? { totalInflow: ledger.totalInflow, totalOutflow: ledger.totalOutflow, remainingBalance: ledger.remainingBalance } : undefined}
         onOpenAnalytics={ledger ? () => onOpenAnalytics(ledger.project.id) : undefined}
         onExportPdf={ledger ? handleExport : undefined}
-        onOpenSettings={isProductionLeader ? () => setAccessModalOpen(true) : undefined}
+        onOpenSettings={ledger?.project.user_id === currentUserId ? () => setAccessModalOpen(true) : undefined}
         onOpenProfile={onOpenProfile}
 
       />
@@ -288,7 +288,7 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile 
                 )}
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {isProductionLeader ? (
+                {currentUserId && ledger?.project.user_id === currentUserId ? (
                   <button onClick={() => setAccessModalOpen(true)} className="btn-secondary">
                     <Settings className="h-4 w-4" />
                     Settings
@@ -461,6 +461,7 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile 
         open={accessModalOpen}
         projectId={projectId}
         projectTitle={ledger?.project.title ?? 'Project'}
+        canManageAccess={ledger?.project.user_id === currentUserId}
         onClose={() => setAccessModalOpen(false)}
       />
 

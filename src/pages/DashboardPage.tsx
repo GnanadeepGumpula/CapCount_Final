@@ -7,7 +7,7 @@ import { Field } from '../components/Field';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../lib/toast';
-import { createProject, deleteProject, fetchProjects, updateProject } from '../lib/api';
+import { createProject, deleteProject, fetchProjects, getCurrentUserId, updateProject } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { getProjectAccess } from '../lib/projectAccess';
 import type { Project } from '../lib/types';
@@ -26,6 +26,7 @@ export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPagePro
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [accessModalProjectId, setAccessModalProjectId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const toast = useToast();
 
   async function load() {
@@ -43,6 +44,18 @@ export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPagePro
 
   useEffect(() => {
     load();
+  }, []);
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const userId = await getCurrentUserId();
+        setCurrentUserId(userId);
+      } catch {
+        setCurrentUserId(null);
+      }
+    }
+    loadUser();
   }, []);
 
   return (
@@ -144,6 +157,11 @@ export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPagePro
         open={!!accessModalProjectId}
         projectId={accessModalProjectId ?? ''}
         projectTitle={projects?.find((p) => p.id === accessModalProjectId)?.title ?? 'Project'}
+        canManageAccess={
+          accessModalProjectId
+            ? !!currentUserId && projects?.find((p) => p.id === accessModalProjectId)?.user_id === currentUserId
+            : false
+        }
         onClose={() => setAccessModalProjectId(null)}
       />
 

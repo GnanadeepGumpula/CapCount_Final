@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2, UserRound } from 'lucide-react';
 import { Modal } from '../../components/Modal';
 import { Field } from '../../components/Field';
@@ -10,10 +10,11 @@ interface ProjectAccessModalProps {
   open: boolean;
   projectId: string;
   projectTitle: string;
+  canManageAccess?: boolean;
   onClose: () => void;
 }
 
-export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: ProjectAccessModalProps) {
+export function ProjectAccessModal({ open, projectId, projectTitle, canManageAccess, onClose }: ProjectAccessModalProps) {
   const [entries, setEntries] = useState<ProjectAccessEntry[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: P
   const [managerRole, setManagerRole] = useState(getStoredUserRole());
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canManage = canManageAccess ?? /leader/i.test(managerRole);
 
   useEffect(() => {
     async function loadEntries() {
@@ -44,13 +46,23 @@ export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: P
     }
   }, [open, projectId]);
 
-  const isLeader = useMemo(() => /leader/i.test(managerRole), [managerRole]);
-
   async function addEntry() {
+    if (!canManage) {
+      setError('Only the project owner can add collaborators.');
+      return;
+    }
+
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     const trimmedRole = role.trim();
-    if (!trimmedName || !trimmedEmail || !trimmedRole) return;
+    if (!trimmedName || !trimmedEmail || !trimmedRole) {
+      setError('Name, email, and role are required.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Enter a valid email address.');
+      return;
+    }
     try {
       const entry = await addProjectAccessEntry(projectId, {
         name: trimmedName,
@@ -95,7 +107,7 @@ export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: P
             </Field>
             <button className="btn-secondary" onClick={saveManagerRole}>Save role</button>
           </div>
-          <p className="mt-3 text-sm text-ink-500">{isLeader ? 'Production leader controls are active for this workspace.' : 'Only a production leader can manage shared access.'}</p>
+          <p className="mt-3 text-sm text-ink-500">{canManage ? 'Project owner controls are active for this workspace.' : 'Only the project owner can manage shared access.'}</p>
         </div>
 
         <div className="rounded-2xl border border-ink-200 bg-white p-4">
@@ -108,20 +120,20 @@ export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: P
 
           <div className="mt-4 grid gap-3 md:grid-cols-[1.3fr,1fr,0.7fr,auto]">
             <Field label="Name" htmlFor="access-name">
-              <input id="access-name" value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="e.g. Nikhil" disabled={!isLeader} />
+              <input id="access-name" value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="e.g. Nikhil" disabled={!canManage} />
             </Field>
             <Field label="Email" htmlFor="access-email">
-              <input id="access-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" placeholder="name@email.com" disabled={!isLeader} />
+              <input id="access-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" placeholder="name@email.com" disabled={!canManage} />
             </Field>
             <Field label="Access" htmlFor="access-level">
-              <select id="access-level" value={access} onChange={(e) => setAccess(e.target.value as 'View' | 'Edit' | 'Admin')} className="input" disabled={!isLeader}>
+              <select id="access-level" value={access} onChange={(e) => setAccess(e.target.value as 'View' | 'Edit' | 'Admin')} className="input" disabled={!canManage}>
                 <option value="View">View</option>
                 <option value="Edit">Edit</option>
                 <option value="Admin">Admin</option>
               </select>
             </Field>
             <div className="flex items-end">
-              <button type="button" className="btn-primary" onClick={addEntry} disabled={!isLeader}>
+              <button type="button" className="btn-primary" onClick={addEntry} disabled={!canManage}>
                 <Plus className="h-4 w-4" />
                 Add
               </button>
@@ -130,7 +142,7 @@ export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: P
 
           <div className="mt-4 space-y-2">
             <Field label="Role" htmlFor="access-role">
-              <input id="access-role" value={role} onChange={(e) => setRole(e.target.value)} className="input" placeholder="e.g. Assistant Director" disabled={!isLeader} />
+              <input id="access-role" value={role} onChange={(e) => setRole(e.target.value)} className="input" placeholder="e.g. Assistant Director" disabled={!canManage} />
             </Field>
             {loadingEntries ? (
               <div className="rounded-xl border border-dashed border-ink-200 bg-ink-50 px-4 py-6 text-center text-sm text-ink-500">
@@ -154,7 +166,7 @@ export function ProjectAccessModal({ open, projectId, projectTitle, onClose }: P
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-700">{entry.access}</span>
-                    <button type="button" onClick={() => removeEntry(entry.id)} className="rounded-lg p-2 text-danger-600 hover:bg-danger-50" disabled={!isLeader}>
+                    <button type="button" onClick={() => removeEntry(entry.id)} className="rounded-lg p-2 text-danger-600 hover:bg-danger-50" disabled={!canManage}>
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>

@@ -20,7 +20,7 @@ export async function fetchProjects(): Promise<Project[]> {
   return (data ?? []) as Project[];
 }
 
-async function getCurrentUserId(): Promise<string> {
+export async function getCurrentUserId(): Promise<string> {
   const [{ data: sessionData }, { data: userData }] = await Promise.all([
     supabase.auth.getSession(),
     supabase.auth.getUser(),
