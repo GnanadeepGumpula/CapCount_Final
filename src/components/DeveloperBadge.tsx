@@ -22,7 +22,7 @@ const DeveloperBadge: React.FC = () => {
         <div style={styles.profilePicContainer}>
           <img src="/gnanadeep.jpeg" alt="Gnanadeep Gumpula" style={styles.profilePic} />
         </div>
-        <span style={styles.text}>Buil by Gnanadeep Gumpula</span>
+        <span style={styles.text}>Build by Gnanadeep Gumpula</span>
       </a>
       <button type="button" onClick={handleDismiss} style={styles.dismiss} aria-label="Dismiss developer badge">
         ×
