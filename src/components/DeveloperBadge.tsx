@@ -1,53 +1,90 @@
 import React from "react";
 
-export default function DeveloperBadge() {
-  const [dismissed, setDismissed] = React.useState(true); // Default to true to prevent hydration mismatch flashes
+const DeveloperBadge: React.FC = () => {
+  // Just use regular React state. No localStorage, no sessionStorage.
+  const [dismissed, setDismissed] = React.useState(false);
 
-  React.useEffect(() => {
-    const stored = window.localStorage.getItem("developer-badge-dismissed");
-    setDismissed(stored === "1");
-  }, []);
-
-  const handleDismiss = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevents clicking the close button from triggering page actions behind it
-    window.localStorage.setItem("developer-badge-dismissed", "1");
+  const handleDismiss = () => {
     setDismissed(true);
   };
 
+  // If they clicked cancel, hide it for this specific page view
   if (dismissed) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-[9999] flex items-center gap-2 rounded-full border border-ink-200 bg-white p-2 pr-3 shadow-pop transition-all hover:-translate-y-0.5 pointer-events-auto animate-fade-in font-sans text-xs font-semibold text-ink-900">
+    <div style={styles.badge}>
       <a
         href="https://gnanadeepstudio.vercel.app"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2.5 text-inherit no-underline"
+        style={styles.link}
       >
-        <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-ink-100 shadow-inner">
-          <img 
-            src="/gnanadeep.jpeg" 
-            alt="Gnanadeep Gumpula" 
-            className="h-full w-full object-cover"
-            onError={(e) => {
-              // Standard fallback avatar indicator if your photo asset isn't matched yet
-              e.currentTarget.src = "https://api.dicebear.com/7.x/bottts/svg?seed=gnanadeep";
-            }}
-          />
+        <div style={styles.profilePicContainer}>
+          <img src="/gnanadeep.jpeg" alt="Gnanadeep Gumpula" style={styles.profilePic} />
         </div>
-        <span className="whitespace-nowrap pr-1 text-ink-700 hover:text-brand-700 transition-colors">
-          Build by Gnanadeep Gumpula
-        </span>
+        <span style={styles.text}>Buil by Gnanadeep Gumpula</span>
       </a>
-      
-      <button
-        type="button"
-        onClick={handleDismiss}
-        className="flex h-4 w-4 items-center justify-center rounded-full bg-ink-50 p-0 text-sm font-bold text-ink-400 border-none cursor-pointer transition-colors hover:bg-danger-50 hover:text-danger-600 line-none"
-        aria-label="Dismiss developer badge"
-      >
+      <button type="button" onClick={handleDismiss} style={styles.dismiss} aria-label="Dismiss developer badge">
         ×
       </button>
     </div>
   );
-}
+};
+
+const styles: { [key: string]: React.CSSProperties } = {
+  badge: {
+    position: "fixed",
+    bottom: "20px",
+    right: "20px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    backgroundColor: "#ffffff",
+    color: "#1a1a1a",
+    padding: "8px 10px 8px 8px",
+    borderRadius: "30px",
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontSize: "13px",
+    fontWeight: 500,
+    zIndex: 9999,
+    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+    border: "1px solid rgba(0, 0, 0, 0.05)",
+  },
+  link: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    textDecoration: "none",
+    color: "inherit",
+  },
+  profilePicContainer: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "50%",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f0f0f0",
+  },
+  profilePic: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  text: {
+    whiteSpace: "nowrap",
+  },
+  dismiss: {
+    border: "none",
+    background: "transparent",
+    color: "#666",
+    cursor: "pointer",
+    fontSize: "16px",
+    lineHeight: 1,
+    padding: 0,
+  },
+};
+
+export default DeveloperBadge;

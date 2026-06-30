@@ -15,6 +15,9 @@ export function AuthPage() {
   const [showPw, setShowPw] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
   const [submitting, setSubmitting] = useState(false);
+  
+  // State to toggle the card view dynamically after registration or an unverified login attempt
+  const [showEmailVerificationCheck, setShowEmailVerificationCheck] = useState(false);
 
   function validate(): boolean {
     const next: typeof errors = {};
@@ -29,127 +32,198 @@ export function AuthPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
+    
     setSubmitting(true);
     setErrors((p) => ({ ...p, form: undefined }));
+    
     const fn = mode === 'signin' ? signIn : signUp;
-    const { error } = await fn(email.trim(), password);
-    setSubmitting(false);
-    if (error) {
-      setErrors({ form: error });
-      toast.error(mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed', error);
-      return;
-    }
-    if (mode === 'signup') {
-      toast.success('Account created', 'Welcome to CapCount. Your secure ledger is ready.');
-    } else {
-      toast.success('Signed in', 'Loading your projects…');
+    
+    try {
+      const response = await fn(email.trim(), password);
+      setSubmitting(false);
+
+      // Cast response safely as 'any' to fix the TypeScript property lookup error
+      const resData = response as any;
+      const rawError = resData?.error?.message || resData?.error;
+      
+      if (response && rawError) {
+        const errorMsg = String(rawError);
+
+        // If the error states they need to confirm their email, force-open the confirmation card view
+        if (errorMsg.toLowerCase().includes('confirm your email') || errorMsg.toLowerCase().includes('confirm your account')) {
+          toast.info('Verification Required', 'Please confirm your email address.');
+          setShowEmailVerificationCheck(true);
+          return;
+        }
+
+        setErrors({ form: errorMsg });
+        toast.error(mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed', errorMsg);
+        return;
+      }
+
+      // Action routing on success
+      if (mode === 'signup') {
+        toast.success('Account created', 'Verification link sent to your inbox.');
+        setShowEmailVerificationCheck(true); 
+      } else {
+        toast.success('Signed in', 'Loading your projects…');
+      }
+    } catch (err: any) {
+      setSubmitting(false);
+      const catchMessage = err?.message || '';
+
+      // Fallback check if your auth hook throws the string via catch blocks
+      if (catchMessage.toLowerCase().includes('confirm your email') || catchMessage.toLowerCase().includes('confirm your account')) {
+        toast.info('Verification Required', 'Please confirm your email address.');
+        setShowEmailVerificationCheck(true);
+        return;
+      }
+
+      setErrors({ form: catchMessage || 'Server connection timed out.' });
+      toast.error(mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed', catchMessage || 'Server connection timed out.');
     }
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="grid min-h-screen lg:grid-cols-2 bg-ink-50/40">
       <BrandPanel />
-      <div className="flex items-center justify-center px-5 py-10 sm:px-8">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
+      <div className="flex items-center justify-center px-4 py-10 sm:px-8">
+        <div className="w-full max-w-md">
+          <div className="mb-8 lg:hidden flex justify-center">
             <BrandMark />
           </div>
-          <h1 className="font-display text-2xl font-bold text-ink-900">
-            {mode === 'signin' ? 'Welcome back' : 'Create your account'}
-          </h1>
-          <p className="mt-1.5 text-sm text-ink-500">
-            {mode === 'signin'
-              ? 'Sign in to access your production ledgers.'
-              : 'Start tracking your production finances in minutes.'}
-          </p>
 
-          <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
-            <div>
-              <label className="label" htmlFor="email">
-                <span>Email</span>
-                <span className="text-danger-500">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={`input pl-10 ${errors.email ? 'input-error' : ''}`}
-                  placeholder="you@studio.in"
-                />
-              </div>
-              {errors.email && <p className="mt-1.5 text-xs font-medium text-danger-600">{errors.email}</p>}
-            </div>
-
-            <div>
-              <label className="label" htmlFor="password">
-                <span>Password</span>
-                <span className="text-danger-500">*</span>
-              </label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-                <input
-                  id="password"
-                  type={showPw ? 'text' : 'password'}
-                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`input pl-10 pr-10 ${errors.password ? 'input-error' : ''}`}
-                  placeholder="At least 6 characters"
-                />
+          {/* Structured UI Card Wrap Wrapper */}
+          <div className="bg-white border border-ink-100 rounded-2xl p-6 sm:p-8 shadow-xl shadow-ink-950/[0.02] relative overflow-hidden transition-all duration-300">
+            
+            {showEmailVerificationCheck ? (
+              /* DYNAMIC CARD VIEW: Rendered following unverified login or new registration */
+              <div className="flex flex-col items-center text-center py-4 animate-in fade-in zoom-in-95 duration-300">
+                <div className="h-14 w-14 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center mb-4 text-brand-600 shadow-inner">
+                  <Mail className="h-6 w-6" />
+                </div>
+                <h1 className="font-display text-2xl font-bold text-ink-900 mb-2">
+                  Confirm your email
+                </h1>
+                <p className="text-sm text-ink-500 max-w-sm mb-6 leading-relaxed">
+                  We have sent a confirmation link to <strong className="text-ink-900 font-semibold">{email || 'your email'}</strong>. Please check your inbox to activate your secure ledger.
+                </p>
                 <button
                   type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
-                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  className="btn-primary w-full py-3 justify-center"
+                  onClick={() => {
+                    setShowEmailVerificationCheck(false);
+                    setMode('signin');
+                    setEmail('');
+                    setPassword('');
+                  }}
                 >
-                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  Back to Sign In
                 </button>
               </div>
-              {errors.password && <p className="mt-1.5 text-xs font-medium text-danger-600">{errors.password}</p>}
-            </div>
+            ) : (
+              /* STANDARD CARD VIEW: Traditional application portal forms */
+              <>
+                <h1 className="font-display text-2xl font-bold text-ink-900">
+                  {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+                </h1>
+                <p className="mt-1.5 text-sm text-ink-500">
+                  {mode === 'signin'
+                    ? 'Sign in to access your production ledgers.'
+                    : 'Start tracking your production finances in minutes.'}
+                </p>
 
-            {errors.form && (
-              <div className="animate-fade-in rounded-xl border border-danger-200 bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">
-                {errors.form}
-              </div>
+                <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
+                  <div>
+                    <label className="label" htmlFor="email">
+                      <span>Email</span>
+                      <span className="text-danger-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                      <input
+                        id="email"
+                        type="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className={`input pl-10 ${errors.email ? 'input-error' : ''}`}
+                        placeholder="you@studio.in"
+                      />
+                    </div>
+                    {errors.email && <p className="mt-1.5 text-xs font-medium text-danger-600">{errors.email}</p>}
+                  </div>
+
+                  <div>
+                    <label className="label" htmlFor="password">
+                      <span>Password</span>
+                      <span className="text-danger-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                      <input
+                        id="password"
+                        type={showPw ? 'text' : 'password'}
+                        autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`input pl-10 pr-10 ${errors.password ? 'input-error' : ''}`}
+                        placeholder="At least 6 characters"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPw((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+                        aria-label={showPw ? 'Hide password' : 'Show password'}
+                      >
+                        {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="mt-1.5 text-xs font-medium text-danger-600">{errors.password}</p>}
+                  </div>
+
+                  {errors.form && (
+                    <div className="animate-fade-in rounded-xl border border-danger-200 bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">
+                      {errors.form}
+                    </div>
+                  )}
+
+                  <button type="submit" disabled={submitting} className="btn-primary w-full py-3 justify-center">
+                    {submitting ? (
+                      <>
+                        <Spinner /> {mode === 'signin' ? 'Signing in…' : 'Creating account…'}
+                      </>
+                    ) : (
+                      <>
+                        {mode === 'signin' ? 'Sign in' : 'Create account'}
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                <p className="mt-6 text-center text-sm text-ink-500">
+                  {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode(mode === 'signin' ? 'signup' : 'signin');
+                      setErrors({});
+                    }}
+                    className="font-semibold text-brand-700 hover:text-brand-800"
+                  >
+                    {mode === 'signin' ? 'Sign up' : 'Sign in'}
+                  </button>
+                </p>
+
+                <p className="mt-6 flex items-center justify-center gap-1.5 text-xs text-ink-400">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Your data is encrypted and isolated to your account.
+                </p>
+              </>
             )}
 
-            <button type="submit" disabled={submitting} className="btn-primary w-full py-3">
-              {submitting ? (
-                <>
-                  <Spinner /> {mode === 'signin' ? 'Signing in…' : 'Creating account…'}
-                </>
-              ) : (
-                <>
-                  {mode === 'signin' ? 'Sign in' : 'Create account'}
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          <p className="mt-6 text-center text-sm text-ink-500">
-            {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}{' '}
-            <button
-              type="button"
-              onClick={() => {
-                setMode(mode === 'signin' ? 'signup' : 'signin');
-                setErrors({});
-              }}
-              className="font-semibold text-brand-700 hover:text-brand-800"
-            >
-              {mode === 'signin' ? 'Sign up' : 'Sign in'}
-            </button>
-          </p>
-
-          <p className="mt-6 flex items-center justify-center gap-1.5 text-xs text-ink-400">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Your data is encrypted and isolated to your account.
-          </p>
+          </div>
         </div>
       </div>
     </div>
@@ -160,14 +234,8 @@ function BrandPanel() {
   return (
     <div className="relative hidden overflow-hidden bg-ink-950 lg:flex lg:flex-col lg:justify-between lg:p-12">
       <div className="absolute inset-0 bg-gradient-to-br from-ink-900 via-ink-950 to-brand-950" />
-      <div
-        className="absolute -right-24 top-1/4 h-96 w-96 rounded-full bg-brand-500/20 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="absolute -left-24 bottom-1/4 h-80 w-80 rounded-full bg-accent-500/10 blur-3xl"
-        aria-hidden
-      />
+      <div className="absolute -right-24 top-1/4 h-96 w-96 rounded-full bg-brand-500/20 blur-3xl" aria-hidden />
+      <div className="absolute -left-24 bottom-1/4 h-80 w-80 rounded-full bg-accent-500/10 blur-3xl" aria-hidden />
 
       <div className="relative z-10">
         <BrandMark light />
