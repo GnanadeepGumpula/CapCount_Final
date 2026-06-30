@@ -7,9 +7,8 @@ import { Field } from '../components/Field';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../lib/toast';
-import { createProject, deleteProject, fetchProjects, getCurrentUserId, updateProject } from '../lib/api';
+import { createProject, deleteProject, fetchProjectAccessCounts, fetchProjects, getCurrentUserId, updateProject } from '../lib/api';
 import { formatDate } from '../lib/format';
-import { getProjectAccess } from '../lib/projectAccess';
 import type { Project } from '../lib/types';
 import { ProjectAccessModal } from './project/ProjectAccessModal';
 
@@ -27,6 +26,7 @@ export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPagePro
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [accessModalProjectId, setAccessModalProjectId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [accessCounts, setAccessCounts] = useState<Record<string, number>>({});
   const toast = useToast();
 
   async function load() {
@@ -34,9 +34,16 @@ export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPagePro
     try {
       const data = await fetchProjects();
       setProjects(data);
+      if (data.length > 0) {
+        const counts = await fetchProjectAccessCounts(data.map((project) => project.id));
+        setAccessCounts(counts);
+      } else {
+        setAccessCounts({});
+      }
     } catch (e) {
       toast.error('Could not load projects', e instanceof Error ? e.message : undefined);
       setProjects([]);
+      setAccessCounts({});
     } finally {
       setLoading(false);
     }
@@ -106,6 +113,8 @@ export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPagePro
               <ProjectCard
                 key={p.id}
                 project={p}
+                isOwner={p.user_id === currentUserId}
+                sharedAccessCount={accessCounts[p.id] ?? 0}
                 onOpen={() => onOpenProject(p.id)}
                 onEdit={() => {
                   setEditTarget(p);
@@ -162,7 +171,10 @@ export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPagePro
             ? !!currentUserId && projects?.find((p) => p.id === accessModalProjectId)?.user_id === currentUserId
             : false
         }
-        onClose={() => setAccessModalProjectId(null)}
+        onClose={() => {
+          setAccessModalProjectId(null);
+          load();
+        }}
       />
 
       <ConfirmDialog
@@ -189,6 +201,8 @@ export function DashboardPage({ onOpenProject, onOpenProfile }: DashboardPagePro
 
 interface ProjectCardProps {
   project: Project;
+  isOwner: boolean;
+  sharedAccessCount: number;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -197,8 +211,8 @@ interface ProjectCardProps {
   onOpenAccess: () => void;
 }
 
-function ProjectCard({ project, onOpen, onEdit, onDelete, menuOpen, onToggleMenu, onOpenAccess }: ProjectCardProps) {
-  const accessEntries = getProjectAccess(project.id);
+function ProjectCard({ project, isOwner, sharedAccessCount, onOpen, onEdit, onDelete, menuOpen, onToggleMenu, onOpenAccess }: ProjectCardProps) {
+  const hasSharedAccess = sharedAccessCount > (isOwner ? 1 : 0);
   return (
     <div
       className="group card relative cursor-pointer p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-pop"
@@ -257,12 +271,14 @@ function ProjectCard({ project, onOpen, onEdit, onDelete, menuOpen, onToggleMenu
       <div className="mt-4 flex items-center justify-between border-t border-ink-100 pt-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-ink-400">Created {formatDate(project.created_at)}</span>
-          {accessEntries.length > 0 ? (
-            <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-700">Shared project</span>
+          {hasSharedAccess ? (
+            <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-700">
+              {isOwner ? 'Shared with others' : 'Shared project'}
+            </span>
           ) : null}
         </div>
         <div className="flex items-center gap-2">
-          {accessEntries.length > 0 ? (
+          {hasSharedAccess ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();

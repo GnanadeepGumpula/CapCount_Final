@@ -12,10 +12,11 @@ import type { ProjectLedger } from '../lib/types';
 interface AnalyticsPageProps {
   projectId: string;
   onBack: () => void;
+  onHome: () => void;
   onOpenProfile: () => void;
 }
 
-export function AnalyticsPage({ projectId, onBack, onOpenProfile }: AnalyticsPageProps) {
+export function AnalyticsPage({ projectId, onBack, onHome, onOpenProfile }: AnalyticsPageProps) {
   const [ledger, setLedger] = useState<ProjectLedger | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +70,7 @@ export function AnalyticsPage({ projectId, onBack, onOpenProfile }: AnalyticsPag
 
   return (
     <div className="min-h-screen bg-ink-50">
-      <AppHeader onHome={onBack} onOpenProfile={onOpenProfile} />
+      <AppHeader onHome={onHome} onOpenProfile={onOpenProfile} />
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <button onClick={onBack} className="btn-ghost mb-4 -ml-2">

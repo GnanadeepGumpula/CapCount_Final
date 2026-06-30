@@ -68,6 +68,7 @@ export function ProjectAccessModal({ open, projectId, projectTitle, canManageAcc
         name: trimmedName,
         email: trimmedEmail,
         role: trimmedRole,
+        role_label: trimmedRole,
         access,
       });
       setEntries((cur) => [entry, ...cur]);

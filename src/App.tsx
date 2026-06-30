@@ -78,6 +78,7 @@ function Shell() {
       <AnalyticsPage
         projectId={route.projectId}
         onBack={() => navigate({ name: 'project', projectId: route.projectId })}
+        onHome={() => navigate({ name: 'dashboard' })}
         onOpenProfile={() => navigate({ name: 'profile' })}
       />
     );

@@ -118,6 +118,7 @@ export interface ProjectAccessCreateInput {
   name: string;
   email: string;
   role: string;
+  role_label: string;
   access: 'View' | 'Edit' | 'Admin';
 }
 
@@ -131,10 +132,33 @@ export async function fetchProjectAccess(projectId: string): Promise<ProjectAcce
   return (data ?? []) as ProjectAccessEntry[];
 }
 
+export async function fetchProjectAccessCounts(projectIds: string[]): Promise<Record<string, number>> {
+  if (projectIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('project_access')
+    .select('project_id')
+    .in('project_id', projectIds);
+  if (error) throw new Error(humanizePgError(error));
+  const counts: Record<string, number> = {};
+  for (const row of (data ?? []) as Array<{ project_id: string }>) {
+    const id = row.project_id;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function addProjectAccessEntry(projectId: string, input: ProjectAccessCreateInput): Promise<ProjectAccessEntry> {
   const { data, error } = await supabase
     .from('project_access')
-    .insert({ project_id: projectId, ...input })
+    .insert({
+      project_id: projectId,
+      name: input.name,
+      email: input.email,
+      role: input.role,
+      access: input.access,
+      access_level: input.access,
+      role_label: input.role_label ?? input.role,
+    })
     .select()
     .maybeSingle();
   if (error) throw new Error(humanizePgError(error));

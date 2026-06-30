@@ -122,13 +122,17 @@ CREATE TABLE IF NOT EXISTS project_access (
   role text NOT NULL DEFAULT '',
   role_label text NOT NULL DEFAULT '',
   access text NOT NULL CHECK (access IN ('View','Edit','Admin')),
+  access_level text NOT NULL DEFAULT 'View',
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE project_access
-  ADD COLUMN IF NOT EXISTS access text NOT NULL DEFAULT 'View';
+  ADD COLUMN IF NOT EXISTS access text NOT NULL DEFAULT 'View',
+  ADD COLUMN IF NOT EXISTS access_level text NOT NULL DEFAULT 'View';
 UPDATE project_access SET access = 'View' WHERE access IS NULL;
+UPDATE project_access SET access_level = COALESCE(access, 'View') WHERE access_level IS NULL;
 ALTER TABLE project_access ALTER COLUMN access SET NOT NULL;
+ALTER TABLE project_access ALTER COLUMN access_level SET NOT NULL;
 ALTER TABLE project_access ALTER COLUMN access DROP DEFAULT;
 
 ALTER TABLE project_access ENABLE ROW LEVEL SECURITY;
@@ -198,14 +202,14 @@ CREATE POLICY "delete_project_access" ON project_access FOR DELETE
 CREATE INDEX IF NOT EXISTS idx_project_access_project_id ON project_access(project_id);
 
 CREATE OR REPLACE FUNCTION project_access_add_owner_for_new_project() RETURNS trigger
-  LANGUAGE plpgsql SECURITY DEFINER STABLE SET row_security = off AS $$
+  LANGUAGE plpgsql SECURITY DEFINER SET row_security = off AS $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM project_access
     WHERE project_id = NEW.id
       AND user_id = NEW.user_id
   ) THEN
-    INSERT INTO project_access (project_id, user_id, email, name, role, role_label, access, created_at)
+    INSERT INTO project_access (project_id, user_id, email, name, role, role_label, access, access_level, created_at)
     VALUES (
       NEW.id,
       NEW.user_id,
@@ -213,6 +217,7 @@ BEGIN
       COALESCE(auth.jwt() ->> 'email', ''),
       'Owner',
       'Owner',
+      'Admin',
       'Admin',
       now()
     );

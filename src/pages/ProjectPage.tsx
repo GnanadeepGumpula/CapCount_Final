@@ -4,7 +4,6 @@ import {
   Filter,
   Plus,
   Search,
-  Settings,
   Sparkles,
   Users,
   Wallet,
@@ -260,14 +259,23 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile 
         onExportPdf={ledger ? handleExport : undefined}
         onOpenSettings={ledger?.project.user_id === currentUserId ? () => setAccessModalOpen(true) : undefined}
         onOpenProfile={onOpenProfile}
-
       />
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <button onClick={onBack} className="btn-ghost mb-4 -ml-2">
-          <ArrowLeft className="h-4 w-4" />
-          All projects
-        </button>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button onClick={onBack} className="btn-ghost -ml-2">
+            <ArrowLeft className="h-4 w-4" />
+            All projects
+          </button>
+          {ledger ? (
+            <div className="min-w-0 text-right">
+              <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">{ledger.project.title}</h1>
+              {ledger.project.description && (
+                <p className="mt-1 text-sm text-ink-500">{ledger.project.description}</p>
+              )}
+            </div>
+          ) : null}
+        </div>
 
         {loading ? (
           <ProjectSkeleton />
@@ -280,23 +288,6 @@ export function ProjectPage({ projectId, onBack, onOpenAnalytics, onOpenProfile 
           />
         ) : (
           <>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">{ledger.project.title}</h1>
-                {ledger.project.description && (
-                  <p className="mt-1 max-w-2xl text-sm text-ink-500">{ledger.project.description}</p>
-                )}
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
-                {currentUserId && ledger?.project.user_id === currentUserId ? (
-                  <button onClick={() => setAccessModalOpen(true)} className="btn-secondary">
-                    <Settings className="h-4 w-4" />
-                    Settings
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="font-display text-lg font-semibold text-ink-900">Ledger</h2>

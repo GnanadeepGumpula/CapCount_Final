@@ -8,11 +8,13 @@ ALTER TABLE project_access
   ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS role_label text NOT NULL DEFAULT '',
-  ADD COLUMN IF NOT EXISTS access text NOT NULL DEFAULT 'View';
+  ADD COLUMN IF NOT EXISTS access text NOT NULL DEFAULT 'View',
+  ADD COLUMN IF NOT EXISTS access_level text NOT NULL DEFAULT 'View';
 
 UPDATE project_access SET name = '' WHERE name IS NULL;
 UPDATE project_access SET role = '' WHERE role IS NULL;
 UPDATE project_access SET access = 'View' WHERE access IS NULL;
+UPDATE project_access SET access_level = 'View' WHERE access_level IS NULL;
 UPDATE project_access SET role_label = '' WHERE role_label IS NULL;
 
 ALTER TABLE project_access ALTER COLUMN name DROP DEFAULT;
@@ -21,6 +23,8 @@ ALTER TABLE project_access ALTER COLUMN access DROP DEFAULT;
 ALTER TABLE project_access ALTER COLUMN role_label DROP DEFAULT;
 ALTER TABLE project_access ALTER COLUMN name SET NOT NULL;
 ALTER TABLE project_access ALTER COLUMN role SET NOT NULL;
+ALTER TABLE project_access ALTER COLUMN access SET NOT NULL;
+ALTER TABLE project_access ALTER COLUMN access_level SET NOT NULL;
 ALTER TABLE project_access ALTER COLUMN role_label SET NOT NULL;
 
 ALTER TABLE project_access ENABLE ROW LEVEL SECURITY;
@@ -100,14 +104,14 @@ CREATE POLICY "select_owned_or_shared_projects" ON projects FOR SELECT
     )
   );
 CREATE OR REPLACE FUNCTION project_access_add_owner_for_new_project() RETURNS trigger
-  LANGUAGE plpgsql SECURITY DEFINER STABLE SET row_security = off AS $$
+  LANGUAGE plpgsql SECURITY DEFINER SET row_security = off AS $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM project_access
     WHERE project_id = NEW.id
       AND user_id = NEW.user_id
   ) THEN
-    INSERT INTO project_access (project_id, user_id, email, name, role, role_label, access, created_at)
+    INSERT INTO project_access (project_id, user_id, email, name, role, role_label, access, access_level, created_at)
     VALUES (
       NEW.id,
       NEW.user_id,
@@ -115,6 +119,7 @@ BEGIN
       COALESCE(auth.jwt() ->> 'email', ''),
       'Owner',
       'Owner',
+      'Admin',
       'Admin',
       now()
     );

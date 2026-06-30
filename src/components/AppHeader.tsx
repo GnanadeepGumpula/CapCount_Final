@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Download, Film, LogOut, Menu, Settings, UserCircle2, Info } from 'lucide-react';
+import { BarChart3, Download, Film, LayoutGrid, LogOut, Menu, Settings, UserCircle2, Info } from 'lucide-react';
 import { formatINR } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { getStoredUserRole } from '../lib/projectAccess';
@@ -172,6 +172,12 @@ export function AppHeader({ onHome, summary, onOpenAnalytics, onExportPdf, onOpe
 
                   {/* Navigation Route Actions Context List */}
                   <div className="p-2">
+                    {onHome && (
+                      <button type="button" onClick={() => { setMenuOpen(false); onHome(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
+                        <LayoutGrid className="h-4 w-4 text-brand-600" />
+                        All projects
+                      </button>
+                    )}
                     {onOpenAnalytics && (
                       <button type="button" onClick={() => { setMenuOpen(false); onOpenAnalytics(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
                         <BarChart3 className="h-4 w-4 text-brand-600" />

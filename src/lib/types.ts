@@ -66,7 +66,9 @@ export interface ProjectAccessEntry {
   name: string;
   email: string;
   role: string;
+  role_label: string;
   access: 'View' | 'Edit' | 'Admin';
+  access_level?: 'View' | 'Edit' | 'Admin';
   created_at: string;
 }
 
